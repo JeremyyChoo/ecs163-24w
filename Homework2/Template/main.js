@@ -1,208 +1,244 @@
-let abFilter = 25
-const width = window.innerWidth;
-const height = window.innerHeight;
+drawBarChart();
+drawParallelChart();
+drawPieChart();
+function drawBarChart() {
+    const margin = {top: 40, right: 20, bottom: 100, left: 40}, 
+    width = 960 - margin.left - margin.right,
+    height = 550 - margin.top - margin.bottom; 
 
-let scatterLeft = 0, scatterTop = 0;
-let scatterMargin = {top: 10, right: 30, bottom: 30, left: 60},
-    scatterWidth = 400 - scatterMargin.left - scatterMargin.right,
-    scatterHeight = 350 - scatterMargin.top - scatterMargin.bottom;
+    const x = d3.scaleBand()
+            .range([0, width])
+            .padding(0.1);
+    const y = d3.scaleLinear()
+            .range([height, 0]);
 
-let distrLeft = 400, distrTop = 0;
-let distrMargin = {top: 10, right: 30, bottom: 30, left: 60},
-    distrWidth = 400 - distrMargin.left - distrMargin.right,
-    distrHeight = 350 - distrMargin.top - distrMargin.bottom;
-
-let teamLeft = 0, teamTop = 400;
-let teamMargin = {top: 10, right: 30, bottom: 30, left: 60},
-    teamWidth = width - teamMargin.left - teamMargin.right,
-    teamHeight = height-450 - teamMargin.top - teamMargin.bottom;
-
-
-d3.csv("players.csv").then(rawData =>{
-    console.log("rawData", rawData);
-    
-    rawData.forEach(function(d){
-        d.AB = Number(d.AB);
-        d.H = Number(d.H);
-        d.salary = Number(d.salary);
-        d.SO = Number(d.SO);
-    });
-    
-
-    rawData = rawData.filter(d=>d.AB>abFilter);
-    rawData = rawData.map(d=>{
-                          return {
-                              "H_AB":d.H/d.AB,
-                              "SO_AB":d.SO/d.AB,
-                              "teamID":d.teamID,
-                          };
-    });
-    console.log(rawData);
-    
-//plot 1
     const svg = d3.select("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", 
+                    "translate(" + margin.left + "," + margin.top + ")");
 
-    const g1 = svg.append("g")
-                .attr("width", scatterWidth + scatterMargin.left + scatterMargin.right)
-                .attr("height", scatterHeight + scatterMargin.top + scatterMargin.bottom)
-                .attr("transform", `translate(${scatterMargin.left}, ${scatterMargin.top})`)
+    svg.append("text")
+    .attr("class", "chart-title")
+    .attr("x", width / 2)
+    .attr("y", -margin.top / 2)
+    .text("Favorite Music Genres Among Respondents");
 
-    // X label
-    g1.append("text")
-    .attr("x", scatterWidth / 2)
-    .attr("y", scatterHeight + 50)
-    .attr("font-size", "20px")
-    .attr("text-anchor", "middle")
-    .text("H/AB")
-    
+    d3.csv("mxmh_survey_results.csv").then(function(data) {
+    const genreCounts = d3.rollups(data, v => v.length, d => d['Fav genre'])
+                        .map(([key, value]) => ({ Genre: key, Count: value }));
+    genreCounts.sort((a, b) => d3.descending(a.Count, b.Count));
 
-    // Y label
-    g1.append("text")
-    .attr("x", -(scatterHeight / 2))
-    .attr("y", -40)
-    .attr("font-size", "20px")
-    .attr("text-anchor", "middle")
-    .attr("transform", "rotate(-90)")
-    .text("SO/AB")
+    x.domain(genreCounts.map(d => d.Genre));
+    y.domain([0, d3.max(genreCounts, d => d.Count)]);
 
-    // X ticks
-    const x1 = d3.scaleLinear()
-    .domain([0, d3.max(rawData, d => d.H_AB)])
-    .range([0, scatterWidth])
+    svg.selectAll(".bar")
+        .data(genreCounts)
+    .enter().append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.Genre))
+        .attr("width", x.bandwidth())
+        .attr("y", d => y(d.Count))
+        .attr("height", d => height - y(d.Count));
 
-    const xAxisCall = d3.axisBottom(x1)
-                        .ticks(7)
-    g1.append("g")
-    .attr("transform", `translate(0, ${scatterHeight})`)
-    .call(xAxisCall)
+    svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x))
     .selectAll("text")
-        .attr("y", "10")
-        .attr("x", "-5")
+        .style("text-anchor", "end")
+        .attr("dx", "-.8em")
+        .attr("dy", ".15em")
+        .attr("transform", "rotate(-65)");
+
+    svg.append("g")
+        .call(d3.axisLeft(y));
+
+    svg.append("text")
+        .attr("class", "axis-label")
         .attr("text-anchor", "end")
-        .attr("transform", "rotate(-40)")
+        .attr("x", width / 2)
+        .attr("y", height + margin.top + 40)
+        .text("Genre");
 
-    // Y ticks
-    const y1 = d3.scaleLinear()
-    .domain([0, d3.max(rawData, d => d.SO_AB)])
-    .range([scatterHeight, 0])
-
-    const yAxisCall = d3.axisLeft(y1)
-                        .ticks(13)
-    g1.append("g").call(yAxisCall)
-
-    const rects = g1.selectAll("circle").data(rawData)
-
-    rects.enter().append("circle")
-         .attr("cx", function(d){
-             return x1(d.H_AB);
-         })
-         .attr("cy", function(d){
-             return y1(d.SO_AB);
-         })
-         .attr("r", 3)
-         .attr("fill", "#69b3a2")
-
-//space
-    const g2 = svg.append("g")
-                .attr("width", distrWidth + distrMargin.left + distrMargin.right)
-                .attr("height", distrHeight + distrMargin.top + distrMargin.bottom)
-                .attr("transform", `translate(${distrLeft}, ${distrTop})`)
-
-//plot 2
-    
-    q = rawData.reduce((s, { teamID }) => (s[teamID] = (s[teamID] || 0) + 1, s), {});
-    r = Object.keys(q).map((key) => ({ teamID: key, count: q[key] }));
-    console.log(r);
-
-           
-    const g3 = svg.append("g")
-                .attr("width", teamWidth + teamMargin.left + teamMargin.right)
-                .attr("height", teamHeight + teamMargin.top + teamMargin.bottom)
-                .attr("transform", `translate(${teamMargin.left}, ${teamTop})`)
-
-    // X label
-    g3.append("text")
-    .attr("x", teamWidth / 2)
-    .attr("y", teamHeight + 50)
-    .attr("font-size", "20px")
-    .attr("text-anchor", "middle")
-    .text("Team")
-    
-
-    // Y label
-    g3.append("text")
-    .attr("x", -(teamHeight / 2))
-    .attr("y", -40)
-    .attr("font-size", "20px")
-    .attr("text-anchor", "middle")
-    .attr("transform", "rotate(-90)")
-    .text("Number of players")
-
-    // X ticks
-    const x2 = d3.scaleBand()
-    .domain(r.map(d => d.teamID))
-    .range([0, teamWidth])
-    .paddingInner(0.3)
-    .paddingOuter(0.2)
-
-    const xAxisCall2 = d3.axisBottom(x2)
-    g3.append("g")
-    .attr("transform", `translate(0, ${teamHeight})`)
-    .call(xAxisCall2)
-    .selectAll("text")
-        .attr("y", "10")
-        .attr("x", "-5")
+    svg.append("text")
+        .attr("class", "axis-label")
         .attr("text-anchor", "end")
-        .attr("transform", "rotate(-40)")
+        .attr("x", -height / 2)
+        .attr("y", -margin.left + 20)
+        .attr("transform", "rotate(-90)")
+        .text("Count");
+    });
+}
 
-    // Y ticks
-    const y2 = d3.scaleLinear()
-    .domain([0, d3.max(r, d => d.count)])
-    .range([teamHeight, 0])
+function drawParallelChart() {
+    const data = [{'Frequency [Classical]': 0.3333333333333333,
+    'Frequency [Pop]': 1.0,
+    'Frequency [Metal]': 0.0,
+    'Anxiety': 0.3,
+    'Depression': 0.0,
+    'Insomnia': 0.1,
+    'OCD': 0.0},
+    {'Frequency [Classical]': 0.6666666666666666,
+    'Frequency [Pop]': 0.6666666666666666,
+    'Frequency [Metal]': 0.0,
+    'Anxiety': 0.7,
+    'Depression': 0.2,
+    'Insomnia': 0.2,
+    'OCD': 0.1},
+    {'Frequency [Classical]': 0.0,
+    'Frequency [Pop]': 0.3333333333333333,
+    'Frequency [Metal]': 0.6666666666666666,
+    'Anxiety': 0.7,
+    'Depression': 0.7,
+    'Insomnia': 1.0,
+    'OCD': 0.2},
+    {'Frequency [Classical]': 0.6666666666666666,
+    'Frequency [Pop]': 0.6666666666666666,
+    'Frequency [Metal]': 0.0,
+    'Anxiety': 0.9,
+    'Depression': 0.7,
+    'Insomnia': 0.3,
+    'OCD': 0.3},
+    {'Frequency [Classical]': 0.0,
+    'Frequency [Pop]': 0.6666666666666666,
+    'Frequency [Metal]': 0.0,
+    'Anxiety': 0.7,
+    'Depression': 0.2,
+    'Insomnia': 0.5,
+    'OCD': 0.9}];
+    
+  const margin = {top: 60, right: 10, bottom: 10, left: 0},
+        width = 960 - margin.left - margin.right,
+        height = 550 - margin.top - margin.bottom;
+  
+  const svg = d3.select(d3.selectAll("svg").nodes()[1])
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+  .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+  
+  const dimensions = Object.keys(data[0]);
+  const y = {};
+  for (const d of dimensions) {
+    y[d] = d3.scaleLinear()
+      .domain(d3.extent(data, function(p) { return +p[d]; }))
+      .range([height, 0]);
+  }
+  
+  const x = d3.scalePoint()
+    .range([0, width])
+    .padding(1)
+    .domain(dimensions);
+  
+  svg.append("text")
+        .attr("class", "chart-title")  
+        .attr("x", width / 2)
+        .attr("y", -20)
+        .style("text-anchor", "middle")
+        .text("Music Genre Frequency and Mental Health Correlation");
+  svg.selectAll("myPath")
+    .data(data)
+    .enter().append("path")
+      .attr("d", function(d) {
+        return d3.line()(dimensions.map(function(p) { return [x(p), y[p](d[p])]; }));
+      })
+      .style("fill", "none")
+      .style("stroke", "#69b3a2")
+      .style("opacity", 0.5)
+  
 
-    const yAxisCall2 = d3.axisLeft(y2)
-                        .ticks(6)
-    g3.append("g").call(yAxisCall2)
+  svg.selectAll("myAxis")
+    .data(dimensions).enter()
+    .append("g")
+    .attr("transform", function(d) { return "translate(" + x(d) + ")"; })
+    .each(function(d) { d3.select(this).call(d3.axisLeft().scale(y[d])); })
+    .append("text")
+      .style("text-anchor", "middle")
+      .attr("y", -9)
+      .text(function(d) { return d; })
+      .style("fill", "black")
+  
+}
 
-    const rects2 = g3.selectAll("rect").data(r)
+function drawPieChart() {
 
-    rects2.enter().append("rect")
-    .attr("y", d => y2(d.count))
-    .attr("x", (d) => x2(d.teamID))
-    .attr("width", x2.bandwidth)
-    .attr("height", d => teamHeight - y2(d.count))
-    .attr("fill", "grey")
+    d3.csv("mxmh_survey_results.csv").then(function(data) {
 
+        const counts = d3.rollup(data, v => v.length, d => d.Anxiety);
+                
+        let total = 736;
 
+        const pieData = Array.from(counts, ([level, count]) => {
+            return { level: level, count: count, percentage: (count / total * 100).toFixed(2) };
+        });
 
+        data = pieData;
 
+        const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+        const width = 1100 - margin.left - margin.right;
+        const height = 600 - margin.top - margin.bottom;
+        const radius = Math.min(width, height) / 2;
 
+        const svg = d3.select(d3.selectAll("svg").nodes()[2])
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left + width / 2}, ${margin.top + height / 2})`);
 
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
 
+        const pie = d3.pie()
+            .value(function(d) { return d.count; })(data);
 
+        const arc = d3.arc()
+            .innerRadius(0)
+            .outerRadius(radius);
 
+        svg.selectAll("path")
+          .data(pie)
+          .enter()
+          .append("path")
+            .attr("d", arc)
+            .attr("fill", function(d) { return color(d.data.level); })
+            .attr("stroke", "white")
+            .style("stroke-width", "2px")
+            .style("opacity", 0.7);
+    
+        svg.selectAll("text")
+          .data(pie)
+          .enter()
+          .append("text")
+            .text(function(d) { if (d.data.percentage > 1) return d.data.percentage + '%'; else return ""})
+            .attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
+            .style("text-anchor", "middle")
+            .style("font-size", "12px");
+        
+            svg.append("text")
+            .attr("x", 0)
+            .attr("y", -height / 2 -10) 
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .text("Mental Health Assessment Overview");
+            const legend = svg.append("g")
+    .attr("transform", `translate(${width / 2 - 100}, ${-height / 2 + 40})`); 
+    pieData.forEach(function(d, i) {
+        legend.append("rect")
+            .attr("x", 0)
+            .attr("y", i * 20) 
+            .attr("width", 18)
+            .attr("height", 18)
+            .style("fill", color(d.level));
+    
+        legend.append("text")
+            .attr("x", 24)
+            .attr("y", i * 20 + 9)
+            .attr("dy", "0.35em")
+            .style("text-anchor", "start")
+            .text(`Level ${d.level}`);
+    });
 
+        
+    });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}).catch(function(error){
-    console.log(error);
-});
-
+}
